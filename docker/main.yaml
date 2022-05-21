@@ -1,0 +1,66 @@
+# ---Command---
+# ansible-playbook --connection=local -i localhost, main.yaml
+
+# ---Requirements---
+# ansible-galaxy collection install community.docker
+# pip install docker
+
+# --- PostgreSQL commands used ---
+# REVOKE ALL ON schema public FROM public;
+# CREATE DATABASE setup;
+# \c setup;
+# CREATE schema setup;
+# CREATE TABLE setup.setup (name varchar(20), number varchar(20));
+# INSERT INTO setup.setup(name, number) values('setup', '15');
+# CREATE USER setup PASSWORD 'password';
+# GRANT USAGE ON SCHEMA setup TO setup;
+# GRANT SELECT ON setup.setup TO setup;
+
+- name: setup
+  hosts: all
+  tasks:
+
+    - name: Create postgres container
+      community.docker.docker_container:
+        name: postgres
+        recreate: yes
+        restart_policy: always
+        image: postgres
+        network_mode: host
+        user: 1000:1000 #id the container runs with (change if needed)
+        volumes:
+          - "{{ playbook_dir }}/postgres/data:/var/lib/postgresql/data"
+        env:
+          POSTGRES_PASSWORD: password #better use ansible-vault to encrypt password
+
+    - name: Create postgres-exporter container
+      community.docker.docker_container:
+        name: postgres-exporter
+        recreate: yes
+        restart_policy: always
+        image: quay.io/prometheuscommunity/postgres-exporter
+        network_mode: host
+        env:
+          DATA_SOURCE_NAME: "postgresql://postgres:password@localhost:5432/postgres?sslmode=disable"
+
+    - name: Create prometheus container
+      community.docker.docker_container:
+        name: prometheus
+        recreate: yes
+        restart_policy: always
+        image: prom/prometheus
+        network_mode: host
+        volumes:
+          - "{{ playbook_dir }}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml"
+
+    - name: Create grafana container
+      community.docker.docker_container:
+        name: grafana
+        recreate: yes
+        restart_policy: always
+        image: grafana/grafana-enterprise:8.4.3
+        network_mode: host
+        user: 1000:1000 #id the container runs with (change if needed)
+        volumes:
+          - "{{ playbook_dir }}/grafana/data:/var/lib/grafana"
+          - "{{ playbook_dir }}/grafana/provisioning:/etc/grafana/provisioning"

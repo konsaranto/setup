@@ -1,0 +1,17 @@
+apiVersion: 1
+
+# deleteDatasources:
+#   - name: Postgres
+
+datasources:
+  - name: Postgres
+    type: postgres
+    url: localhost:5432
+    uid: 2
+    user: setup
+    database: setup
+    secureJsonData:
+      password: 'password' #better use ansible-vault to encrypt password
+    jsonData:
+      sslmode: 'disable'
+      postgresVersion: 10

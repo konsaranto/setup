@@ -1,0 +1,97 @@
+# Create Peristent Volume
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres
+  labels:
+    type: local
+    app: postgres
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 100Mi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: "/tmp/postgres/data"
+
+---
+
+# Create Peristent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Mi
+
+---
+
+# Create ConfigMap with database login details
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+data:
+  POSTGRES_DB: setup
+  POSTGRES_USER: setup
+  POSTGRES_PASSWORD: password
+
+---
+
+# Create Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:10.4
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgres
+      volumes:
+        - name: postgres
+          persistentVolumeClaim:
+            claimName: postgres
+
+---
+
+# Create Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  type: NodePort
+  ports:
+   - port: 5432
+  selector:
+   app: postgres
